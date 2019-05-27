@@ -124,18 +124,21 @@ static int print_conntrack(struct action_util *au, FILE *f, struct rtattr *arg)
 
 	parse_rtattr_nested(tb, TCA_CONNTRACK_MAX, arg);
 	if (tb[TCA_CONNTRACK_PARMS] == NULL) {
-		fprintf(f, "[NULL conntrack parameters]");
+		fprintf(stderr, "[NULL conntrack parameters]");
 		return -1;
 	}
 
 	ci = RTA_DATA(tb[TCA_CONNTRACK_PARMS]);
 
-	fprintf(f, "conntrack zone %d", ci->zone);
-	if (ci->commit)
-		fprintf(f, " commit");
+	print_string(PRINT_ANY, "kind", "%s ", "conntrack");
+	print_int(PRINT_ANY, "zone", "zone %d", ci->zone);
 
-	fprintf(f, "\n\t index %u ref %d bind %d", ci->index,
-		ci->refcnt, ci->bindcnt);
+	if (ci->commit)
+		print_bool(PRINT_ANY, "commit", " commit", true);
+
+	print_uint(PRINT_ANY, "index", "\n \tindex %u", ci->index);
+	print_int(PRINT_ANY, "ref", " ref %d", ci->refcnt);
+	print_int(PRINT_ANY, "bind", " bind %d", ci->bindcnt);
 
 	if (show_stats) {
 		if (tb[TCA_CONNTRACK_TM]) {
@@ -144,7 +147,8 @@ static int print_conntrack(struct action_util *au, FILE *f, struct rtattr *arg)
 			print_tm(f, tm);
 		}
 	}
-	fprintf(f, "\n");
+
+	print_string(PRINT_FP, NULL, "%s", "\n ");
 
 	return 0;
 }
