@@ -505,8 +505,17 @@ enum {
 /* FIXME: CT_STATE flags; that's the right place? */
 #define TCA_FLOWER_KEY_CT_FLAGS_NEW               0x01 /* Beginning of a new connection. */
 #define TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED       0x02 /* Part of an existing connection. */
+#define TCA_FLOWER_KEY_CT_FLAGS_RELATED           0x04 /* Related to an established
+                                                        * connection. */
+#define TCA_FLOWER_KEY_CT_FLAGS_REPLY_DIR         0x08 /* Flow is in the reply direction. */
 #define TCA_FLOWER_KEY_CT_FLAGS_INVALID           0x10 /* Could not track connection. */
 #define TCA_FLOWER_KEY_CT_FLAGS_TRACKED           0x20 /* Conntrack has occurred. */
+#define TCA_FLOWER_KEY_CT_FLAGS_SRC_NAT           0x40 /* Packet's source address/port was
+                                                        * mangled by NAT.
+                                                        */
+#define TCA_FLOWER_KEY_CT_FLAGS_DST_NAT           0x80 /* Packet's destination address/port
+                                                        * was mangled by NAT.
+                                                        */
 
 enum {
 	TCA_FLOWER_KEY_ENC_OPTS_UNSPEC,

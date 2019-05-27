@@ -214,49 +214,49 @@ static int flower_parse_matching_flags(char *str,
 	return 0;
 }
 
+struct ct_state {
+	char *str;
+	int flag;
+};
+
+static struct ct_state ct_states[] = {
+	{ "trk", TCA_FLOWER_KEY_CT_FLAGS_TRACKED },
+	{ "new", TCA_FLOWER_KEY_CT_FLAGS_NEW },
+	{ "est", TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED },
+	{ "inv", TCA_FLOWER_KEY_CT_FLAGS_INVALID },
+	{ "rel", TCA_FLOWER_KEY_CT_FLAGS_RELATED },
+	{ "rpl", TCA_FLOWER_KEY_CT_FLAGS_REPLY_DIR },
+	{ "snat", TCA_FLOWER_KEY_CT_FLAGS_SRC_NAT },
+	{ "dnat", TCA_FLOWER_KEY_CT_FLAGS_DST_NAT },
+};
+
 static int flower_parse_ct_state(char *str, int value_type, int mask_type,
 				 struct nlmsghdr *n)
 {
 	int flags = 0;
 	int mask = 0;
-	int len ,i;
-
-	struct ct_state {
-		char *str;
-		int flag;
-		bool set;
-	} ct_states[] = {
-		{ "+new", TCA_FLOWER_KEY_CT_FLAGS_NEW, true },
-		{ "-new", TCA_FLOWER_KEY_CT_FLAGS_NEW, false },
-		{ "+est", TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED, true },
-		{ "-est", TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED, false },
-		{ "+inv", TCA_FLOWER_KEY_CT_FLAGS_INVALID, true },
-		{ "-inv", TCA_FLOWER_KEY_CT_FLAGS_INVALID, false },
-		{ "+trk", TCA_FLOWER_KEY_CT_FLAGS_TRACKED, true },
-		{ "-trk", TCA_FLOWER_KEY_CT_FLAGS_TRACKED, false },
-	};
-
-	fprintf(stderr, "[yk] flower_parse_ct_state str: %s\n", str);
+	int len, i;
 
 	while (*str != '\0') {
 		for (i = 0; i < ARRAY_SIZE(ct_states); i++) {
 			len = strlen(ct_states[i].str);
-			if (strncmp(str, ct_states[i].str, len))
+			if (strncmp(str+1, ct_states[i].str, len))
 				continue;
 
-			if (ct_states[i].set)
+			if (str[0] == '+')
 				flags |= ct_states[i].flag;
+
 			mask |= ct_states[i].flag;
 			break;
 		}
 
+		/* invalid ct_state */
 		if (i == ARRAY_SIZE(ct_states))
 			return -1;
 
-		str += len;
+		str += len+1;
 	}
 
-	fprintf(stderr, "[yk] flower_parse_ct_state flags: %X, mask: %X\n", flags, mask);
 	addattr8(n, MAX_MSG, value_type, flags);
 	addattr8(n, MAX_MSG, mask_type, mask);
 	return 0;
@@ -1572,14 +1572,31 @@ static void flower_print_ct_state_flags(char *name, struct rtattr *flags_attr,
 {
 	SPRINT_BUF(namefrm);
 	SPRINT_BUF(out);
-	size_t done;
+	char *str = out;
+	int i;
+	int len;
+	int key;
+	int mask;
 
 	if (!flags_attr)
 		return;
 
-	done = sprintf(out, "%x", rta_getattr_u8(flags_attr));
-	if (mask_attr)
-		sprintf(out + done, "/%x", rta_getattr_u8(mask_attr));
+	key = rta_getattr_u8(flags_attr);
+	mask = rta_getattr_u8(mask_attr);
+
+	for (i = 0; i < ARRAY_SIZE(ct_states); i++) {
+		if (mask & ct_states[i].flag) {
+			len = strlen(ct_states[i].str);
+
+			if (key & ct_states[i].flag)
+				sprintf(str, "%s%s", "+", ct_states[i].str);
+			else
+				sprintf(str, "%s%s", "-", ct_states[i].str);
+
+			str += len+1;
+		}
+	}
+
 
 	sprintf(namefrm, "\n  %s %%s", name);
 	print_string(PRINT_ANY, name, namefrm, out);
@@ -1787,7 +1804,8 @@ static int flower_print_opt(struct filter_util *qu, FILE *f,
 	}
 
 	if (tb[TCA_FLOWER_KEY_CT_STATE])
-		flower_print_ct_state_flags("ct_state", tb[TCA_FLOWER_KEY_CT_STATE],
+		flower_print_ct_state_flags("ct_state",
+					    tb[TCA_FLOWER_KEY_CT_STATE],
 					    tb[TCA_FLOWER_KEY_CT_STATE_MASK]);
 
 	open_json_object("keys");
