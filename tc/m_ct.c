@@ -322,7 +322,6 @@ parse_ct(struct action_util *a, int *argc_p, char ***argv_p, int tca_id,
 		} else if (ct_action & TCA_CT_ACT_NAT_DST) {
 			addattr(n, MAX_MSG, TCA_CT_NAT_DST);
 		}
-		fprintf(stderr, "ct: addr:%d, addr2 %d\n", addr1.family, addr2.family);
 		if(addr1.family != AF_UNSPEC) {
 			int attr;
 
@@ -386,13 +385,14 @@ static void ct_print_nat(int ct_action, struct rtattr **tb)
 	char out[256] = "";
 	bool nat = false;
 
-	if (!(ct_action & TCA_CT_ACT_NAT))
+	if (!tb[TCA_CT_NAT])
 		return;
 
-	if (ct_action & TCA_CT_ACT_NAT_SRC) {
+	if (tb[TCA_CT_NAT_SRC]) {
 		nat = true;
 		done += sprintf(out + done, "src");
-	} else if (ct_action & TCA_CT_ACT_NAT_DST) {
+	}
+	if (tb[TCA_CT_NAT_DST]) {
 		nat = true;
 		done += sprintf(out + done, "dst");
 	}
