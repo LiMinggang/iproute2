@@ -198,8 +198,6 @@ parse_ct(struct action_util *a, int *argc_p, char ***argv_p, int tca_id,
 	int ct_action = 0;
 	int ret;
 
-	tail = addattr_nest(n, MAX_MSG, tca_id);
-
 	if (argc && matches(*argv, "ct") == 0)
 		NEXT_ARG_FWD();
 
@@ -207,8 +205,7 @@ parse_ct(struct action_util *a, int *argc_p, char ***argv_p, int tca_id,
 		if (matches(*argv, "zone") == 0) {
 			NEXT_ARG();
 
-			if (ct_parse_u16(*argv,
-					 TCA_CT_ZONE, TCA_CT_UNSPEC, n)) {
+			if (get_u16(&sel.zone, *argv, 10)) {
 				fprintf(stderr, "ct: Illegal \"zone\"\n");
 				return -1;
 			}
@@ -247,16 +244,20 @@ parse_ct(struct action_util *a, int *argc_p, char ***argv_p, int tca_id,
 			netport = true;
 		} else if (matches(*argv, "clear") == 0) {
 			ct_action |= TCA_CT_ACT_CLEAR;
+			sel.clear = true;
 		} else if (matches(*argv, "commit") == 0) {
 			ct_action |= TCA_CT_ACT_COMMIT;
+			sel.commit = true;
 		} else if (matches(*argv, "force") == 0) {
 			ct_action |= TCA_CT_ACT_FORCE;
+			fprintf(stderr, "ct: \"force\" is nct supported, ignore\n");
 		} else if (matches(*argv, "index") == 0) {
 			NEXT_ARG();
 			if (get_u32(&sel.index, *argv, 10)) {
 				fprintf(stderr, "ct: Illegal \"index\"\n");
 				return -1;
 			}
+			fprintf(stderr, "ct: \"index\" is not supported, ignore\n");
 		} else if (matches(*argv, "mark") == 0) {
 			NEXT_ARG();
 
@@ -309,9 +310,41 @@ parse_ct(struct action_util *a, int *argc_p, char ***argv_p, int tca_id,
 	parse_action_control_dflt(&argc, &argv, &sel.action, false,
 				  TC_ACT_PIPE);
 
-	addattr16(n, MAX_MSG, TCA_CT_ACTION, ct_action);
+	tail = NLMSG_TAIL(n);
+	addattr_l(n, MAX_MSG, tca_id, NULL, 0);
 	addattr_l(n, MAX_MSG, TCA_CT_PARMS, &sel, sizeof(sel));
-	addattr_nest_end(n, tail);
+
+
+	if(ct_action & TCA_CT_ACT_NAT) {
+		addattr(n, MAX_MSG, TCA_CT_NAT);
+		if (ct_action & TCA_CT_ACT_NAT_SRC) {
+			addattr(n, MAX_MSG, TCA_CT_NAT_SRC);
+		} else if (ct_action & TCA_CT_ACT_NAT_DST) {
+			addattr(n, MAX_MSG, TCA_CT_NAT_DST);
+		}
+		fprintf(stderr, "ct: addr:%d, addr2 %d\n", addr1.family, addr2.family);
+		if(addr1.family != AF_UNSPEC) {
+			int attr;
+
+			attr = addr1.family == AF_INET ? TCA_CT_NAT_IPV4_MIN :
+					TCA_CT_NAT_IPV6_MIN;
+			addattr_l(n, MAX_MSG, attr, addr1.data, addr1.bytelen);
+			if(addr2.family != AF_UNSPEC) {
+				attr = addr2.family == AF_INET ? TCA_CT_NAT_IPV4_MAX :
+						TCA_CT_NAT_IPV6_MAX;
+				addattr_l(n, MAX_MSG, attr, addr2.data, addr2.bytelen);
+			} else {
+				attr = addr1.family == AF_INET ? TCA_CT_NAT_IPV4_MAX :
+					TCA_CT_NAT_IPV6_MAX;
+				addattr_l(n, MAX_MSG, attr, addr1.data, addr1.bytelen);
+			}
+		}
+		if(netport) {
+			addattr16(n, MAX_MSG, TCA_CT_NAT_PORT_MIN, port1);
+			addattr16(n, MAX_MSG, TCA_CT_NAT_PORT_MAX, port2);
+		}
+	}
+	tail->rta_len = (char *)NLMSG_TAIL(n) - (char *)tail;
 
 	*argc_p = argc;
 	*argv_p = argv;
