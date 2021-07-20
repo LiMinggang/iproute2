@@ -347,6 +347,8 @@ static struct flower_ct_states {
 	{ "est", TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED },
 	{ "inv", TCA_FLOWER_KEY_CT_FLAGS_INVALID },
 	{ "rpl", TCA_FLOWER_KEY_CT_FLAGS_REPLY },
+	{ "rlt", TCA_FLOWER_KEY_CT_FLAGS_RELATED },
+	{ "snt", TCA_FLOWER_KEY_CT_FLAGS_SRC_NAT },
 };
 
 static int flower_parse_ct_state(char *str, struct nlmsghdr *n)
@@ -2158,19 +2160,19 @@ static void flower_print_ct_state(struct rtattr *flags_attr,
 				  struct rtattr *mask_attr)
 {
 	SPRINT_BUF(out);
-	uint16_t state;
-	uint16_t state_mask;
+	uint8_t state;
+	uint8_t state_mask;
 	size_t done = 0;
 	int i;
 
 	if (!flags_attr)
 		return;
 
-	state = rta_getattr_u16(flags_attr);
+	state = rta_getattr_u8(flags_attr);
 	if (mask_attr)
-		state_mask = rta_getattr_u16(mask_attr);
+		state_mask = rta_getattr_u8(mask_attr);
 	else
-		state_mask = UINT16_MAX;
+		state_mask = UINT8_MAX;
 
 	for (i = 0; i < ARRAY_SIZE(flower_ct_states); i++) {
 		if (!(state_mask & flower_ct_states[i].flag))

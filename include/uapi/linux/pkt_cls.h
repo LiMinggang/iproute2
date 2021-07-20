@@ -590,9 +590,10 @@ enum {
 	TCA_FLOWER_KEY_CT_FLAGS_NEW = 1 << 0, /* Beginning of a new connection. */
 	TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED = 1 << 1, /* Part of an existing connection. */
 	TCA_FLOWER_KEY_CT_FLAGS_RELATED = 1 << 2, /* Related to an established connection. */
-	TCA_FLOWER_KEY_CT_FLAGS_TRACKED = 1 << 3, /* Conntrack has occurred. */
+	TCA_FLOWER_KEY_CT_FLAGS_REPLY = 1 << 3,
 	TCA_FLOWER_KEY_CT_FLAGS_INVALID = 1 << 4, /* Conntrack is invalid. */
-	TCA_FLOWER_KEY_CT_FLAGS_REPLY = 1 << 5, /* Packet is in the reply direction. */
+	TCA_FLOWER_KEY_CT_FLAGS_TRACKED = 1 << 5, /* Conntrack has occurred. */
+	TCA_FLOWER_KEY_CT_FLAGS_SRC_NAT = 1 << 6, /* Packet is in the reply direction. */
 	__TCA_FLOWER_KEY_CT_FLAGS_MAX,
 };
 

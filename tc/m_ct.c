@@ -427,32 +427,20 @@ static void ct_print_nat(int ct_action, struct rtattr **tb)
 		print_string(PRINT_ANY, "nat", " nat", "");
 }
 
-static void ct_print_labels(struct rtattr *attr,
-			    struct rtattr *mask_attr)
+static void ct_print_labels(__u32 labels[],
+			    __u32 labels_mask[])
 {
-	const unsigned char *str;
-	bool print_mask = false;
+	bool print_mask = true;
 	char out[256], *p;
-	int data_len, i;
+	int data_len;
 
-	if (!attr)
-		return;
-
-	data_len = RTA_PAYLOAD(attr);
-	hexstring_n2a(RTA_DATA(attr), data_len, out, sizeof(out));
+	data_len = 16;
+	hexstring_n2a((const __u8 *)labels, data_len, out, sizeof(out));
 	p = out + data_len*2;
 
-	data_len = RTA_PAYLOAD(attr);
-	str = RTA_DATA(mask_attr);
-	if (data_len != 16)
-		print_mask = true;
-	for (i = 0; !print_mask && i < data_len; i++) {
-		if (str[i] != 0xff)
-			print_mask = true;
-	}
 	if (print_mask) {
 		*p++ = '/';
-		hexstring_n2a(RTA_DATA(mask_attr), data_len, p,
+		hexstring_n2a((const __u8 *)labels_mask, data_len, p,
 			      sizeof(out)-(p-out));
 		p += data_len*2;
 	}
@@ -461,12 +449,27 @@ static void ct_print_labels(struct rtattr *attr,
 	print_string(PRINT_ANY, "label", " label %s", out);
 }
 
+static void print_masked_value(__u32 type_max, const char *name,
+			       __u32 value, __u32 mask)
+{
+	SPRINT_BUF(namefrm);
+	SPRINT_BUF(out);
+	size_t done;
+
+	done = sprintf(out, "%u", value);
+	if (mask != type_max)
+		sprintf(out + done, "/0x%x", mask);
+	sprintf(namefrm, " %s %%s", name);
+	print_string(PRINT_ANY, name, namefrm, out);
+}
+
 static int print_ct(struct action_util *au, FILE *f, struct rtattr *arg)
 {
 	struct rtattr *tb[TCA_CT_MAX + 1];
 	const char *commit;
-	struct tc_ct *p;
-	int ct_action = 0;
+	struct tc_conntrack *p;
+	int ct_action = 0, i;
+	bool label = false;
 
 	print_string(PRINT_ANY, "kind", "%s", "ct");
 	if (arg == NULL)
@@ -482,17 +485,27 @@ static int print_ct(struct action_util *au, FILE *f, struct rtattr *arg)
 
 	if (tb[TCA_CT_ACTION])
 		ct_action = rta_getattr_u16(tb[TCA_CT_ACTION]);
-	if (ct_action & TCA_CT_ACT_COMMIT) {
-		commit = ct_action & TCA_CT_ACT_FORCE ?
-			 "commit force" : "commit";
+	if (p->commit) {
+		commit = "commit";
 		print_string(PRINT_ANY, "action", " %s", commit);
-	} else if (ct_action & TCA_CT_ACT_CLEAR) {
+	} else if (p->clear) {
 		print_string(PRINT_ANY, "action", " %s", "clear");
 	}
 
-	print_masked_u32("mark", tb[TCA_CT_MARK], tb[TCA_CT_MARK_MASK], false);
-	print_masked_u16("zone", tb[TCA_CT_ZONE], NULL, false);
-	ct_print_labels(tb[TCA_CT_LABELS], tb[TCA_CT_LABELS_MASK]);
+	if (p->mark)
+		print_masked_value(UINT32_MAX, "mark", p->mark, p->mark_mask);
+	if (p->zone)
+		print_masked_value(UINT16_MAX, "zone", p->zone, 0);
+
+	for (i = 0; i < 4; i++) {
+		if (p->labels[i]) {
+			label = true;
+			break;
+		}
+	}
+
+	if (label)
+		ct_print_labels(p->labels, p->labels_mask);
 	ct_print_nat(ct_action, tb);
 
 	print_action_control(f, " ", p->action, "");
